@@ -1,6 +1,6 @@
 import http from 'http';
 import { Server } from 'socket.io';
-import app from './app';
+import app, { isOriginAllowed } from './app';
 import config from './config';
 import { connectToDatabase, disconnectFromDatabase } from './lib/mongoose';
 import logger from './lib/logger';
@@ -11,7 +11,14 @@ import initSocket from './api/socketHandler';
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
     methods: ['GET', 'POST'],
   },
 });
@@ -48,20 +55,22 @@ initSocket(io);
 /**
  * ========= GRACEFUL SHUTDOWN =========
  */
-const shutdown = async () => {
-  try {
-    stopScheduler();
-    await disconnectFromDatabase();
-    logger.warn('🛑 Server shutdown completed');
+process.on('SIGTERM', async () => {
+  logger.info('SIGTERM received. Starting graceful shutdown...');
+  stopScheduler();
+  await disconnectFromDatabase();
+  server.close(() => {
+    logger.info('Server closed. Process terminating.');
     process.exit(0);
-  } catch (err) {
-    logger.error('Shutdown error', err);
-    process.exit(1);
-  }
-};
+  });
+});
 
-process.on('SIGTERM', shutdown);
-process.on('SIGINT', shutdown);
-
-
-
+process.on('SIGINT', async () => {
+  logger.info('SIGINT received. Starting graceful shutdown...');
+  stopScheduler();
+  await disconnectFromDatabase();
+  server.close(() => {
+    logger.info('Server closed. Process terminating.');
+    process.exit(0);
+  });
+});
