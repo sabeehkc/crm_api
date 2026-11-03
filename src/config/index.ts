@@ -5,7 +5,7 @@ dotenv.config();
 const config = {
   PORT: process.env.PORT || 5025,
   NODE_ENV: process.env.NODE_ENV || 'development',
-  MONGO_URI: process.env.MONGO_URI || 'mongodb://localhost:27017/crm',
+  MONGO_URI: process.env.MONGO_URI || 'mongodb+srv://wg457129_db_user:xuw0d6VV4JRMfx4b@cluster0.y8dq24y.mongodb.net/',
   REDIS_URI: process.env.REDIS_URI || 'redis://127.0.0.1:6379',
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
   JWT_SECRET: process.env.JWT_SECRET || 'your_jwt_secret_key',
