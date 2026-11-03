@@ -82,6 +82,5 @@ const taskSchema = new Schema<ITask>(
 
 taskSchema.index({ milestoneId: 1 });
 taskSchema.index({ projectId: 1 });
-taskSchema.index({ tenantId: 1 });
 
 export default model<ITask>('Task', taskSchema);
