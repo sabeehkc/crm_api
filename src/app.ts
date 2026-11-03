@@ -17,60 +17,34 @@ const app = express();
 app.set('trust proxy', 1);
 
 /**
- * ========= CORS =========
- * Configure CORS to allow requests from frontend
+ * ========= UNRESTRICTED CORS MIDDLEWARE =========
+ * Dynamically echoes back the requesting origin and allows credentials
+ * Works unconditionally for any frontend (Vercel, localhost, custom domains)
  */
-const envOrigins = process.env.FRONTEND_URL
-  ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
-  : [];
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  }
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization, X-Requested-With, x-refresh-token, Accept, Origin',
+  );
+  res.setHeader('Access-Control-Expose-Headers', 'set-cookie, authorization');
 
-export const allowedOrigins = [
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3025',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:3001',
-  'http://127.0.0.1:3025',
-  'http://192.168.1.11:3000',
-  'https://crm.luvid.in',
-  'https://www.luvid.in',
-  'https://crm-teal-nu.vercel.app',
-  ...envOrigins,
-].filter(Boolean);
-
-export const isOriginAllowed = (origin: string | undefined): boolean => {
-  if (!origin) return true; // Allow non-browser requests (Postman, curl, server-to-server)
-
-  if (
-    origin.startsWith('http://localhost:') ||
-    origin.startsWith('http://127.0.0.1:') ||
-    origin.startsWith('http://192.168.') ||
-    origin.endsWith('.vercel.app') ||
-    allowedOrigins.includes(origin)
-  ) {
-    return true;
+  // Handle preflight OPTIONS requests immediately
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
   }
 
-  return false;
-};
+  next();
+});
 
-const corsOptions: cors.CorsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    if (isOriginAllowed(origin)) {
-      callback(null, true);
-    } else {
-      // Return false to gracefully deny CORS instead of throwing an unhandled Error (which causes Render 500 wildcard)
-      callback(null, false);
-    }
-  },
-  credentials: true, // Allow cookies and authorization headers
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-refresh-token'],
-  exposedHeaders: ['set-cookie'],
-};
-
-// Enable CORS for all requests (automatically handles preflight OPTIONS for all routes)
-app.use(cors(corsOptions));
+export const isOriginAllowed = (_origin: string | undefined): boolean => true;
 
 /**
  * ========= CORE =========
@@ -113,10 +87,10 @@ app.use(
   '/uploads',
   (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
-    if (origin && isOriginAllowed(origin)) {
+    if (origin) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Access-Control-Allow-Credentials', 'true');
-    } else if (!origin) {
+    } else {
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
 
@@ -126,7 +100,7 @@ app.use(
 
     // Handle preflight requests
     if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
+      return res.status(204).end();
     }
 
     next();

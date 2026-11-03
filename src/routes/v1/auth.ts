@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { register, login, logout, refreshToken, googleLogin } from '@/controllers/v1/auth';
+import { register, login, logout, refreshToken } from '@/controllers/v1/auth';
 import { authenticate } from '@/middlewares/authenticate';
 import { validateRequest } from '@/middlewares/validationError';
-import { registerSchema, loginSchema, googleLoginSchema } from '@/zod/auth';
+import { registerSchema, loginSchema } from '@/zod/auth';
 
 const router = Router();
 
@@ -20,15 +20,6 @@ const router = Router();
  *             $ref: '#/components/schemas/RegisterRequest'
  */
 router.post('/register', validateRequest(registerSchema), register);
-
-/**
- * @swagger
- * /api/v1/auth/google:
- *   post:
- *     summary: Login/Register user with Google credential
- *     tags: [Authentication]
- */
-router.post('/google', validateRequest(googleLoginSchema), googleLogin);
 
 /**
  * @swagger

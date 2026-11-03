@@ -97,12 +97,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const { email, password } = req.body;
 
     const user = await User.findOne({ email }).select('+password');
-    if (user && (user.authProvider === 'google' || (!user.password && user.googleId))) {
-      return res.status(400).json({
-        success: false,
-        message: 'This email is registered with a social login method. Please sign in using your social account.',
-      });
-    }
 
     if (!user || !(await user.comparePassword(password))) {
       return res.status(401).json({
@@ -117,8 +111,6 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     user.lastLogin = new Date();
     user.loginHistory = [...(user.loginHistory || []), new Date()];
     await user.save();
-
-
 
     const tenant = await Tenant.findById(user.tenantId);
 
@@ -182,125 +174,5 @@ export const refreshToken = async (req: Request, res: Response, next: NextFuncti
       success: false,
       message: 'Invalid refresh token',
     });
-  }
-};
-
-export const googleLogin = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { credential } = req.body;
-
-    const verifyResponse = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
-    if (!verifyResponse.ok) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid Google token',
-      });
-    }
-
-    const payload: any = await verifyResponse.json();
-
-    if (config.GOOGLE_CLIENT_ID && payload.aud !== config.GOOGLE_CLIENT_ID) {
-      return res.status(400).json({
-        success: false,
-        message: 'Token audience mismatch',
-      });
-    }
-
-    const { email, name, sub, picture, given_name, family_name } = payload;
-
-    if (!email) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email not provided by Google account',
-      });
-    }
-
-    let user = await User.findOne({ email });
-
-    if (user) {
-      if (!user.isActive) {
-        return res.status(403).json({
-          success: false,
-          message: 'User account is inactive',
-        });
-      }
-
-      if (!user.googleId || user.authProvider === 'local') {
-        return res.status(400).json({
-          success: false,
-          message: 'This email is registered with another login method. Please log in using your email and password.',
-        });
-      }
-    } else {
-      // Create new tenant first
-      const tenantName = `${name || email.split('@')[0]}'s Company`;
-      let slug = generateSlug(tenantName);
-      const existingTenant = await Tenant.findOne({ slug });
-      if (existingTenant) {
-        slug = `${slug}-${Math.random().toString(36).substring(2, 7)}`;
-      }
-
-      const tenant = await Tenant.create({
-        name: tenantName,
-        slug,
-        isActive: true,
-      });
-
-      const allPages = [
-        'projects',
-        'enquiries',
-        'quotations',
-        'payments',
-        'expenses',
-        'forms',
-        'chat',
-        'website-content',
-        'subscriptions',
-        'settings',
-        'users',
-      ];
-
-      // Create new user as owner (admin) of the new tenant
-      user = await User.create({
-        email,
-        name: name || `${given_name || ''} ${family_name || ''}`.trim(),
-        role: 'admin',
-        tenantId: tenant._id,
-        isActive: true,
-        authProvider: 'google',
-        googleId: sub,
-        pages: allPages,
-        profile: {
-          firstName: given_name || '',
-          lastName: family_name || '',
-          profilePicture: picture || '',
-        },
-      });
-
-      tenant.ownerId = user._id;
-      await tenant.save();
-    }
-
-    const { accessToken, refreshToken } = generateTokens(user._id.toString(), user.tokenVersion);
-    // Update lastLogin timestamp and record login history for Google login
-    user.lastLogin = new Date();
-    user.loginHistory = [...(user.loginHistory || []), new Date()];
-    await user.save();
-
-    await user.save();
-    const tenant = await Tenant.findById(user.tenantId);
-
-    res.status(200).json({
-      success: true,
-      message: 'Authentication successful',
-      data: {
-        user,
-        tenant,
-        accessToken,
-        refreshToken,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
 };
